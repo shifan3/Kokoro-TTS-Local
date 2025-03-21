@@ -49,10 +49,8 @@ class KokoroTTS:
         self.model = build_model(None, device)
         self.alignment = Alignment(device)
         self.device = device
-        self.voices = self.get_available_voices()
+        self.voices = list_available_voices()
         self.output_dir = "outputs"
-        print('lang_code', self.model.lang_code, type(self.model.g2p))
-        print('g2p', self.model.g2p('A. eight'))
 
     def get_available_voices(self):
         """Get list of available voice models."""

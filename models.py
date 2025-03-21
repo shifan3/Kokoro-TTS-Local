@@ -241,7 +241,7 @@ def build_model(model_path: str, device: str) -> KPipeline:
                 print(f"Config downloaded to {config_path}")
             
             # Download voice files
-            downloaded_voices = download_voice_files()
+            downloaded_voices = list_available_voices()
             
             if not downloaded_voices:
                 print("Error: No voice files available. Cannot proceed.")
