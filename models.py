@@ -8,6 +8,7 @@ import codecs
 from pathlib import Path
 import numpy as np
 import shutil
+import logging
 
 # Set environment variables for proper encoding
 os.environ["PYTHONIOENCODING"] = "utf-8"
@@ -95,9 +96,9 @@ def load_config(config_path: str) -> dict:
 # Initialize espeak-ng
 phonemizer_available = False  # Global flag to track if phonemizer is working
 try:
-    from phonemizer.backend.espeak.wrapper import EspeakWrapper
-    from phonemizer import phonemize
-    import espeakng_loader
+    from phonemizer.backend.espeak.wrapper import EspeakWrapper # type: ignore
+    from phonemizer import phonemize # type: ignore
+    import espeakng_loader # type: ignore
     
     # Make library available first
     library_path = espeakng_loader.get_library_path()
@@ -113,25 +114,25 @@ try:
         test_phonemes = phonemize('test', language='en-us')
         if test_phonemes:
             phonemizer_available = True
-            print("Phonemizer successfully initialized")
+            logging.info("Phonemizer successfully initialized")
         else:
-            print("Note: Phonemization returned empty result")
-            print("TTS will work, but phoneme visualization will be disabled")
+            logging.info("Note: Phonemization returned empty result")
+            logging.info("TTS will work, but phoneme visualization will be disabled")
     except Exception as e:
         # Continue without espeak functionality
-        print(f"Note: Phonemizer not available: {e}")
-        print("TTS will work, but phoneme visualization will be disabled")
+        logging.info(f"Note: Phonemizer not available: {e}")
+        logging.info("TTS will work, but phoneme visualization will be disabled")
 
 except ImportError as e:
-    print(f"Installing required phonemizer packages...")
+    logging.info(f"Installing required phonemizer packages...")
     import subprocess
     try:
         subprocess.check_call(["pip", "install", "espeakng-loader", "phonemizer-fork"])
         
         # Try again after installation
-        from phonemizer.backend.espeak.wrapper import EspeakWrapper
-        from phonemizer import phonemize
-        import espeakng_loader
+        from phonemizer.backend.espeak.wrapper import EspeakWrapper # type: ignore
+        from phonemizer import phonemize # type: ignore
+        import espeakng_loader # type: ignore
         
         library_path = espeakng_loader.get_library_path()
         data_path = espeakng_loader.get_data_path()
@@ -144,16 +145,16 @@ except ImportError as e:
             test_phonemes = phonemize('test', language='en-us')
             if test_phonemes:
                 phonemizer_available = True
-                print("Phonemizer successfully initialized")
+                logging.info("Phonemizer successfully initialized")
             else:
-                print("Note: Phonemization returned empty result")
-                print("TTS will work, but phoneme visualization will be disabled")
+                logging.info("Note: Phonemization returned empty result")
+                logging.info("TTS will work, but phoneme visualization will be disabled")
         except Exception as e:
-            print(f"Note: Phonemizer still not functional: {e}")
-            print("TTS will work, but phoneme visualization will be disabled")
+            logging.warning(f"Note: Phonemizer still not functional: {e}")
+            logging.warning("TTS will work, but phoneme visualization will be disabled")
     except Exception as e:
-        print(f"Note: Could not install or initialize phonemizer: {e}")
-        print("TTS will work, but phoneme visualization will be disabled")
+        logging.warning(f"Note: Could not install or initialize phonemizer: {e}")
+        logging.warning("TTS will work, but phoneme visualization will be disabled")
 
 # Initialize pipeline globally
 _pipeline = None
@@ -166,14 +167,14 @@ def download_voice_files():
     from huggingface_hub import hf_hub_download
     downloaded_voices = []
     
-    print("\nDownloading voice files...")
+    logging.info("\nDownloading voice files...")
     for voice_file in VOICE_FILES:
         try:
             # Full path where the voice file should be
             voice_path = voices_dir / voice_file
             
             if not voice_path.exists():
-                print(f"Downloading {voice_file}...")
+                logging.info(f"Downloading {voice_file}...")
                 # Download to a temporary location first
                 temp_path = hf_hub_download(
                     repo_id="hexgrad/Kokoro-82M",
@@ -186,12 +187,12 @@ def download_voice_files():
                 os.makedirs(os.path.dirname(voice_path), exist_ok=True)
                 shutil.move(temp_path, voice_path)
                 downloaded_voices.append(voice_file)
-                print(f"Successfully downloaded {voice_file}")
+                logging.info(f"Successfully downloaded {voice_file}")
             else:
-                print(f"Voice file {voice_file} already exists")
+                logging.info(f"Voice file {voice_file} already exists")
                 downloaded_voices.append(voice_file)
         except Exception as e:
-            print(f"Warning: Failed to download {voice_file}: {e}")
+            logging.info(f"Warning: Failed to download {voice_file}: {e}")
             continue
     
     # Clean up temporary directory
@@ -199,9 +200,9 @@ def download_voice_files():
         shutil.rmtree("temp_voices")
     
     if not downloaded_voices:
-        print("Warning: No voice files could be downloaded. Please check your internet connection.")
+        logging.warning("Warning: No voice files could be downloaded. Please check your internet connection.")
     else:
-        print(f"Successfully processed {len(downloaded_voices)} voice files")
+        logging.info(f"Successfully processed {len(downloaded_voices)} voice files")
     
     return downloaded_voices
 
@@ -218,7 +219,7 @@ def build_model(model_path: str, device: str) -> KPipeline:
                 model_path = 'kokoro-v1_0.pth'
             
             if not os.path.exists(model_path):
-                print(f"Downloading model file {model_path}...")
+                logging.info(f"Downloading model file {model_path}...")
                 from huggingface_hub import hf_hub_download
                 model_path = hf_hub_download(
                     repo_id="hexgrad/Kokoro-82M",
@@ -226,25 +227,25 @@ def build_model(model_path: str, device: str) -> KPipeline:
                     local_dir=".",
                     force_download=True
                 )
-                print(f"Model downloaded to {model_path}")
+                logging.info(f"Model downloaded to {model_path}")
             
             # Download config if it doesn't exist
             config_path = "config.json"
             if not os.path.exists(config_path):
-                print("Downloading config file...")
+                logging.info("Downloading config file...")
                 config_path = hf_hub_download(
                     repo_id="hexgrad/Kokoro-82M",
                     filename="config.json",
                     local_dir=".",
                     force_download=True
                 )
-                print(f"Config downloaded to {config_path}")
+                logging.info(f"Config downloaded to {config_path}")
             
             # Download voice files
             downloaded_voices = list_available_voices()
             
             if not downloaded_voices:
-                print("Error: No voice files available. Cannot proceed.")
+                logging.error("Error: No voice files available. Cannot proceed.")
                 raise ValueError("No voice files available")
             
             # Initialize pipeline with American English by default
@@ -265,14 +266,14 @@ def build_model(model_path: str, device: str) -> KPipeline:
                 if os.path.exists(voice_path):
                     try:
                         _pipeline.load_voice(voice_path)
-                        print(f"Successfully loaded voice: {voice_file}")
+                        logging.info(f"Successfully loaded voice: {voice_file}")
                         break  # Successfully loaded a voice
                     except Exception as e:
-                        print(f"Warning: Failed to load voice {voice_file}: {e}")
+                        logging.warning(f"Warning: Failed to load voice {voice_file}: {e}")
                         continue
             
         except Exception as e:
-            print(f"Error initializing pipeline: {e}")
+            logging.error(f"Error initializing pipeline: {e}")
             raise
     return _pipeline
 
@@ -282,7 +283,7 @@ def list_available_voices() -> List[str]:
     
     # Create voices directory if it doesn't exist
     if not voices_dir.exists():
-        print(f"Creating voices directory at {voices_dir.absolute()}")
+        logging.info(f"Creating voices directory at {voices_dir.absolute()}")
         voices_dir.mkdir(exist_ok=True)
         return []
     
@@ -291,11 +292,11 @@ def list_available_voices() -> List[str]:
     
     # If no voice files found in voices directory
     if not voice_files:
-        print(f"No voice files found in {voices_dir.absolute()}")
+        logging.info(f"No voice files found in {voices_dir.absolute()}")
         # Try to find voice files in the root directory's voices folder
         root_voices = list(Path(".").glob("voices/*.pt"))
         if root_voices:
-            print("Found voice files in root voices directory, moving them...")
+            logging.info("Found voice files in root voices directory, moving them...")
             for voice_file in root_voices:
                 target_path = voices_dir / voice_file.name
                 if not target_path.exists():
@@ -304,7 +305,7 @@ def list_available_voices() -> List[str]:
             voice_files = list(voices_dir.glob("*.pt"))
     
     if not voice_files:
-        print("No voice files found. Please run the application again to download voices.")
+        logging.info("No voice files found. Please run the application again to download voices.")
         return []
     
     return [f.stem for f in voice_files]
@@ -360,14 +361,14 @@ def generate_speech(
             
         # Ensure voice is loaded before generating
         if voice_name not in model.voices:
-            print(f"Loading voice {voice_name}...")
+            logging.info(f"Loading voice {voice_name}...")
             model.load_voice(voice_path)
             
         if voice_name not in model.voices:
             raise ValueError(f"Failed to load voice {voice_name}")
             
         # Generate speech with the new API
-        print(f"Generating speech with device: {model.device}")
+        logging.info(f"Generating speech with device: {model.device}")
         generator = model(
             text, 
             voice=voice_path,
@@ -384,5 +385,5 @@ def generate_speech(
             
         return None, None
     except Exception as e:
-        print(f"Error generating speech: {e}")
+        logging.info(f"Error generating speech: {e}")
         return None, None

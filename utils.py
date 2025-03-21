@@ -4,7 +4,16 @@ from typing import Callable
 import numpy as np
 import os
 import torch
+import logging
 
+def setup_logging(level=logging.INFO):
+    logging.getLogger().setLevel(level)
+    ch = logging.StreamHandler()
+    ch.setLevel(level)
+    formatter = logging.Formatter(
+        "%(asctime)s;%(process)d;%(levelname)s;%(message)s", "%Y-%m-%d %H:%M:%S")
+    ch.setFormatter(formatter)
+    logging.getLogger().handlers = [ch]
 
 
 LHan = [[0x2E80, 0x2E99],    # Han # So  [26] CJK RADICAL REPEAT, CJK RADICAL RAP
@@ -83,29 +92,33 @@ def fraction_to_words(numerator, denominator):
 punkts = '.,!?;:"/'
 
 def norm_text_for_split(text:str) -> str:
-    replacements = {
-        '。': '.',
-        '，': ',',
-        '！': '!',
-        '？': '?',
-        '；': ';',
-        '：': ':',
-        '“': '"',
-        '”': '"',
-        '‘': "'",
-        '’': "'",
-    }
-    for key, value in replacements.items():
-        text = text.replace(key, value)
+    lines = []
+    for text in text.split('\n'):
+        replacements = {
+            '。': '.',
+            '，': ',',
+            '！': '!',
+            '？': '?',
+            '；': ';',
+            '：': ':',
+            '“': '"',
+            '”': '"',
+            '‘': "'",
+            '’': "'",
+        }
+        for key, value in replacements.items():
+            text = text.replace(key, value)
 
-    
-    text = re.sub(r'([a-zA-Z0-9_.]+)\@([a-zA-Z0-9_.]+)', lambda x : f"{x.group(1).replace('.', '[dot]')}@{x.group(2).replace('.', '[dot]')}", text)
+        
+        text = re.sub(r'([a-zA-Z0-9_.]+)\@([a-zA-Z0-9_.]+)', lambda x : f"{x.group(1).replace('.', '[dot]')}@{x.group(2).replace('.', '[dot]')}", text)
 
-    text = re.sub(rf'\s*([{punkts}])', r'\1 ', text)
-    text = re.sub(r'[-]', ' - ', text)
-    
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
+        text = re.sub(rf'\s*([{punkts}])', r'\1 ', text)
+        text = re.sub(r'[-]', ' - ', text)
+        
+        text = re.sub(r'\s+', ' ', text)
+        text = text.replace('<br>', '\n')
+        lines.append(text.strip())
+    return '\n'.join(lines).strip()
 
 def normalize_text_one(words:list[str], pattern:str, replacement:Callable[[re.Match[str]], str], projections:list[tuple[int, list[str], int, list[str]]]) -> str:
     new_words = []
@@ -181,7 +194,7 @@ def split_sentences(text, max_words=20):
         yield text
         return
     matches = []
-    for m in re.finditer(r'([.!?;]+)', text):
+    for m in re.finditer(r'([.!?;\n]+)', text):
         matches.append((m.start(), m.end(), m.group()))
     if not matches or matches[-1][1] != len(text):
         matches.append((len(text), len(text), ''))

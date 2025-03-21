@@ -1,11 +1,8 @@
 import os
 import torch
-#torch.set_num_threads(1)
 from optparse import OptionParser, Values
 from typing import Annotated
-from  scipy.io import wavfile 
 import json
-import io
 import logging
 import time
 import re
@@ -18,7 +15,7 @@ import json, uvicorn
 import soundfile as sf
 import tempfile
 from generate import KokoroTTS
-from utils import get_audio_duration, norm_text_for_split, get_voice_path, blend_voice
+from utils import blend_voice, setup_logging
 
 
 app = FastAPI()
@@ -75,9 +72,7 @@ def tts(
     if not streaming:
         t1 = time.time()
         audio, info = kokoro.generate(reference_id, text, speed=speed, trim_silence=True, align=align)
-        print(info['logs'])
-        print(audio.shape)
-        print("Time taken: ", time.time() - t1)
+        logging.info("Time taken: ", time.time() - t1)
         temp_file = tempfile.mktemp(suffix='.wav')
         try:    
             sf.write(temp_file, audio, sample_rate)
@@ -106,9 +101,7 @@ def tts(
                                                     'error': info.get("error", "Unknown error")})
                         return
                     assert info["sample_rate"] == sample_rate
-                    print('piece', time.time() - start_time)
                     logs = info.get("logs", None)
-                    #print(logs)
                     word_timestamps = info.get("word_timestamps", None)
 
                     #word wise steaming
@@ -125,7 +118,6 @@ def tts(
                             end = word_timestamps_part[-1]['end']
                             end_frame = int(end * sample_rate)
                             audio_part:np.ndarray = audio[prev_sent:end_frame]
-                            #print('audio_part', audio.shape, prev_sent, int(end * sample_rate), len(audio_part), ' '.join([word_timestamp['text'] for word_timestamp in word_timestamps_part]))
                             prev_sent = end_frame
                             assert info["dtype"] == dtype
                             
@@ -160,16 +152,6 @@ def tts(
 
 
 
-def setup_logging(level=logging.INFO):
-    logging.getLogger().setLevel(level)
-    ch = logging.StreamHandler()
-    ch.setLevel(level)
-    formatter = logging.Formatter(
-        "%(asctime)s;%(process)d;%(levelname)s;%(message)s", "%Y-%m-%d %H:%M:%S")
-    ch.setFormatter(formatter)
-    logging.getLogger().handlers = [ch]
-
-
 inference_engine = None
 def setup_app(opts):
     setup_logging(logging.INFO)
@@ -181,31 +163,6 @@ def setup_app(opts):
     for audio, info in kokoro.generate_stream("1", text, speed=0.6, trim_silence=True, align=True):
         pass
     app.kokoro = kokoro
-    #app.lock = Lock()
-    """
-    for resp in inference_engine.inference(
-        ServeTTSRequest(
-            text="Hello, how are you?",
-            references=[],
-            reference_id=None,
-            streaming=False,
-        )
-    ):
-        pass
-    
-    for resp in inference_engine.inference(
-        ServeTTSRequest(
-            text="Transformers provides APIs to quickly download and use those pretrained models on a given text",
-            references=[],
-            reference_id=None,
-            streaming=False,
-        )
-    ):
-        if resp.code == 'segment' or resp.code == 'final':
-            samplerate, audio = resp.audio
-            wavfile.write("/mnt/data5/test.wav", samplerate, audio)
-    wavfile.write("/mnt/data5/test.wav", samplerate, audio)
-    """
     logging.info("Engine Setup Done")
 
 if __name__ == "__main__":

@@ -28,7 +28,7 @@ import numpy as np
 from num2words import num2words
 import time
 import tempfile
-import re
+import logging
 from models import (
     list_available_voices, build_model,
     generate_speech, download_voice_files
@@ -57,19 +57,19 @@ class KokoroTTS:
         try:
             # Initialize model to trigger voice downloads
             if self.model is None:
-                print("Initializing model and downloading voices...")
+                logging.info("Initializing model and downloading voices...")
                 self.model = build_model(None, self.device)
             
             voices = list_available_voices()
             if not voices:
-                print("No voices found after initialization. Attempting to download...")
+                logging.info("No voices found after initialization. Attempting to download...")
                 download_voice_files()  # Try downloading again
                 voices = list_available_voices()
                 
-            print("Available voices:", voices)
+            logging.info(f"Available voices: {voices}")
             return voices
         except Exception as e:
-            print(f"Error getting voices: {e}")
+            logging.info(f"Error getting voices: {e}")
             return []
 
     def generate_stream(self,voice, text, speed=1.0, sample_rate=SAMPLE_RATE, trim_silence=False, align=False):
@@ -89,8 +89,8 @@ class KokoroTTS:
         
         
         # Generate speech
-        print(f"\nGenerating speech for: '{text}'")
-        print(f"Using voice: {voice}")
+        logging.info(f"Generating speech for: '{text}'")
+        logging.info(f"Using voice: {voice}")
         align_p = 0
         temp_dir = tempfile.mkdtemp()
         try:
@@ -99,9 +99,9 @@ class KokoroTTS:
             speed2 = speed / speed1
             for i_text, text in enumerate(split_sentences(text)):
                 t1 = time.time()
-                print('text', text)
+                logging.info(f'text {i_text}: {text}')
                 text, projections = normalize_text(text)
-                print('normalized text', text)
+                logging.info(f'normalized text {i_text}: {text}')
                 generator = self.model(text, voice=get_voice_path(voice), speed=speed1, split_pattern=r'\n+')
                 
                 all_audio = []
@@ -110,6 +110,8 @@ class KokoroTTS:
                         if isinstance(audio, np.ndarray):
                             audio = torch.from_numpy(audio).float()
                         all_audio.append(audio)
+                        logging.debug(f"Generated segment: {gs}")
+                        logging.debug(f"Phonemes: {ps}")
                         logs += f"Generated segment: {gs}\n"
                         logs += f"Phonemes: {ps}\n"
                 
@@ -121,6 +123,7 @@ class KokoroTTS:
                 wav_path = os.path.join(temp_dir, f"{base_name}.{i_text}.wav")
                 sf.write(wav_path, final_audio, sample_rate)
                 if speed2 < 1:
+                    logging.debug(f"use ffmpeg to slow down audio by {speed2}x")
                     logs += f"use ffmpeg to slow down audio by {speed2}x\n"
                     
                     cmd = f"ffmpeg -i {wav_path} -af \"atempo={speed2}\" {wav_path}.1.wav > {wav_path}.log 2>&1"
@@ -128,11 +131,13 @@ class KokoroTTS:
                         raise Exception("Failed to slow down audio")
                     #with open(wav_path + ".log", "r") as f:
                     #    logs += f.read() + "\n"
-                    logs += f"ffmpeg command: {cmd}\n"
+                    
                     wav_path = wav_path + ".1.wav"
                     
                 
                 if trim_silence:
+                    logging.debug(f"trimming silence from audio")
+                    logs += f"trimming silence from audio\n"
                     cmd = f'ffmpeg -i {wav_path} -af "silenceremove=start_periods=1:start_duration=0.1:start_silence=0.1:start_threshold=0.001,areverse,silenceremove=start_periods=1:start_duration=0.1:start_silence=0.1:start_threshold=0.001,areverse,aformat=sample_fmts=s32:channel_layouts=mono" {wav_path}.2.wav > {wav_path}.log 2>&1 '
                     
                     if os.system(cmd) != 0:
@@ -142,9 +147,12 @@ class KokoroTTS:
                     wav_path = wav_path + ".2.wav"
                 if align:
                     try:
+                        logging.debug(f"aligning audio")
+                        logs += f"aligning audio\n"
                         word_timestamps = self.alignment.align(wav_path, text)
                         #logs += f"Word timestamps: {word_timestamps}\n"
                     except Exception as e:
+                        logging.error(f"Error aligning audio: {e}")
                         logs += f"Error aligning audio: {e}\n"
                         import traceback
                         traceback.print_exc()
@@ -185,8 +193,9 @@ class KokoroTTS:
                             cur['start'] = prev['end']
                             cur['end'] = prev['end']
                     info["word_timestamps"] = word_timestamps
-
-                logs += f"{i_text+1}{'st' if i_text == 0 else 'nd' if i_text == 1 else 'rd' if i_text == 2 else 'th'} piece Time taken: {time.time() - t1} seconds\n"
+                log = f"{i_text+1}{'st' if i_text == 0 else 'nd' if i_text == 1 else 'rd' if i_text == 2 else 'th'} piece Time taken: {time.time() - t1} seconds"
+                logging.debug(log)
+                logs += log + "\n"
                 info['logs'] = logs
                 yield final_audio, info
                 
