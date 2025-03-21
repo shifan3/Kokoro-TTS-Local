@@ -34,7 +34,7 @@ ENV/
 output*.wav
 *.pth
 *.onnx
-voices/
-voices/*.pt
-voices/**/*.pt
 config.json
+*.log
+logs/
+*.pid
