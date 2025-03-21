@@ -38,3 +38,4 @@ config.json
 *.log
 logs/
 *.pid
+outputs
