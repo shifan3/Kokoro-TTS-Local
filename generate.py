@@ -97,11 +97,14 @@ class KokoroTTS:
             
             speed1 = speed if speed >= 1 else 1
             speed2 = speed / speed1
+            valid_i = 0
             for i_text, text in enumerate(split_sentences(text)):
                 t1 = time.time()
                 logging.info(f'text {i_text}: {text}')
                 text, projections = normalize_text(text)
-                logging.info(f'normalized text {i_text}: {text}')
+                if not text:
+                    continue
+                logging.info(f'normalized text {i_text}: "{text}"')
                 generator = self.model(text, voice=get_voice_path(voice), speed=speed1, split_pattern=r'\n+')
                 
                 all_audio = []
@@ -138,7 +141,7 @@ class KokoroTTS:
                 if trim_silence:
                     logging.debug(f"trimming silence from audio")
                     logs += f"trimming silence from audio\n"
-                    cmd = f'ffmpeg -i {wav_path} -af "silenceremove=start_periods=1:start_duration=0.1:start_silence=0.1:start_threshold=0.001,areverse,silenceremove=start_periods=1:start_duration=0.1:start_silence=0.1:start_threshold=0.001,areverse,aformat=sample_fmts=s32:channel_layouts=mono" {wav_path}.2.wav > {wav_path}.log 2>&1 '
+                    cmd = f'ffmpeg -i {wav_path} -af "silenceremove=start_periods=1:start_duration=0.1:start_silence=0.1:start_threshold=0.001,areverse,silenceremove=start_periods=1:start_duration=0.01:start_silence=0.1:start_threshold=0.001,areverse,aformat=sample_fmts=s32:channel_layouts=mono" {wav_path}.2.wav > {wav_path}.log 2>&1 '
                     
                     if os.system(cmd) != 0:
                         raise Exception("Failed to remove silence from audio")
@@ -197,7 +200,12 @@ class KokoroTTS:
                 logging.debug(log)
                 logs += log + "\n"
                 info['logs'] = logs
+                if valid_i > 0:
+                    silence_duration = 0.1
+                    silence = np.zeros(int(silence_duration * sample_rate), dtype=final_audio.dtype)
+                    final_audio = np.concatenate([silence, final_audio])
                 yield final_audio, info
+                valid_i += 1
                 
         finally:
             shutil.rmtree(temp_dir)
@@ -217,7 +225,7 @@ class KokoroTTS:
                     word_timestamp['start'] += prev_duration
                     word_timestamp['end'] += prev_duration
                     full_word_timestamps.append(word_timestamp)
-                prev_duration += get_audio_duration(audio, sample_rate)
+            prev_duration += get_audio_duration(audio, sample_rate)
         full_audio = np.concatenate(full_audio) 
         info['word_timestamps'] = full_word_timestamps
         return full_audio, info

@@ -154,6 +154,7 @@ def normalize_text(text:str) -> str:
     text = text.replace('[dot]', '.')
     projections = []
     words = text.split(' ')
+    #regex_url = r'(?:https?://)?(?:[-\w.]|(?:%[\da-fA-F]{2}))*'
     words, projections = normalize_text_one(words, r'([a-zA-Z0-9_.]+)\s*\@\s*([a-zA-Z0-9_.]+)', lambda x : f"{x.group(1).replace('.', ' dot ')} at {x.group(2).replace('.', ' dot ')}", projections)
     words, projections = normalize_text_one(words, r'1\s*\$', lambda x : r"one dollar", projections)
     words, projections = normalize_text_one(words, r'(\d+)\s*\$', lambda x : f"{num2words(int(x.group(1)))} dollars", projections)
@@ -163,8 +164,31 @@ def normalize_text(text:str) -> str:
     words, projections = normalize_text_one(words, r'(\d+)/(\d+)', lambda x : fraction_to_words(int(x.group(1)), int(x.group(2))), projections)
     words, projections = normalize_text_one(words, r'(\d+)\s*:\s*(\d+)', lambda x : f"{num2words(int(x.group(1)))} {num2words(int(x.group(2)))}", projections)
     words, projections = normalize_text_one(words, r'(\d+)(nd|th|st)', lambda x : f"{num2words(int(x.group(1)), to='ordinal')}", projections)
+    words, projections = normalize_text_one(words, r'\#\s*(\d+)', lambda x : f"number {num2words(int(x.group(1)))}", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)\%', lambda x : f"{num2words(float(x.group(1)))} percent", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)℃', lambda x : f"{num2words(float(x.group(1)))} degree Celsius", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)°C', lambda x : f"{num2words(float(x.group(1)))} degree Celsius", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)℉', lambda x : f"{num2words(float(x.group(1)))} degree Fahrenheit", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)°F', lambda x : f"{num2words(float(x.group(1)))} degree Fahrenheit", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)°', lambda x : f"{num2words(float(x.group(1)))} degree", projections)
     words, projections = normalize_text_one(words, r'(\d+)s', lambda x : num2words(int(x.group(1)))+'s', projections)
+    
+    
+    words, projections = normalize_text_one(words, r'<=', lambda x : 'less than or equal to', projections)
+    words, projections = normalize_text_one(words, r'>=', lambda x : 'greater than or equal to', projections)
+    words, projections = normalize_text_one(words, r'=', lambda x : 'equals', projections)
+    words, projections = normalize_text_one(words, r'<', lambda x : 'less than', projections)
+    words, projections = normalize_text_one(words, r'>', lambda x : 'greater than', projections)
+    
+    words, projections = normalize_text_one(words, r'\+', lambda x : 'plus', projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)\s*\-\s*(\d+(\.\d+)?)', lambda x : f"{x.group(1)} minus {x.group(3)}", projections)
+    words, projections = normalize_text_one(words, r'×', lambda x : 'times', projections)
+    words, projections = normalize_text_one(words, r'÷', lambda x : 'divided by', projections)
+
+    words, projections = normalize_text_one(words, r'\d+\.\d+', lambda x : num2words(float(x.group(0))), projections)
     words, projections = normalize_text_one(words, r'\d+', lambda x : num2words(int(x.group(0))), projections)
+
+
     words, projections = normalize_text_one(words, r'([^0-9 ]*)(\d+)([^0-9 ]*)', lambda x : f"{x.group(1)} {num2words(int(x.group(2)))} {x.group(3)}", projections)
     
     
@@ -187,8 +211,23 @@ def get_audio_duration(audio:np.ndarray, sample_rate:int) -> float:
     return audio.shape[0] / sample_rate
 
 
+def split_sentences(text):
+    text = re.sub(r'(\d)\.(\d)', r'\1[dot]\2', text)
+    matches = []
+    for m in re.finditer(r'([.!?;\n]+)', text):
+        matches.append((m.start(), m.end(), m.group()))
+    if not matches or matches[-1][1] != len(text):
+        matches.append((len(text), len(text), ''))
+    prev = 0
+    for start, end, delimiter in matches:
+        text1 = text[prev:end].strip()
+        prev = end
+        if text1:
+            yield text1.replace('[dot]', '.')
+       
 
-def split_sentences(text, max_words=20):
+
+def split_sentences_old(text, max_words=20):
     text = text.strip()
     if len(text.split(' ')) <= max_words and text:
         yield text
@@ -237,6 +276,8 @@ def align_words_to_raw_input(input_text:str, words:list[dict], p = 0) -> list[di
 if __name__ == "__main__":
 
     s = 'Please 你好 meet me at 7:30 PM at 42nd Street and 5th Avenue in 2024s during COVID-19. I will be wearing a red shirt worth 1$ and a blue shirt worth 2 $, my email address is shi.fan@gmail.com'
+    s = "It's 70°F outside."
+    s = "I can see a red bird. It's big"
     text = norm_text_for_split(s)
     print(text)
     text1s = []

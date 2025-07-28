@@ -17,6 +17,7 @@ class Alignment:
         self.device = device
         self.alignment_model, self.alignment_tokenizer = load_alignment_model(
             self.device,
+            model_path="pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner",
             dtype=torch.float16 if self.device == "cuda" else torch.float32,
         )
         #self.alignment_model = torch.compile(self.alignment_model,

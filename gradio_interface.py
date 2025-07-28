@@ -78,7 +78,7 @@ def generate_audio(voice1, voice2, blend, reference_id, text, speed, sample_rate
 
 # Initialize model globally
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-model = KokoroTTS(device)
+model = KokoroTTS(device=device)
 
 def create_interface(server_name="0.0.0.0", server_port=7861):
     """Create and launch the Gradio interface."""
