@@ -42,3 +42,4 @@ outputs
 data/tts读mp3文件
 docker/simfang.ttf
 pretrained_local
+tts_wav.zip

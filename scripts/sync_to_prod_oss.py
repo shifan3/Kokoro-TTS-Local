@@ -39,24 +39,17 @@ for fname in glob.glob(f'{ckpt}/**/*', recursive=True):
     rel_path = os.path.relpath(fname, ckpt)
     to_path = f'kokoro/{version}/pretrained_local/{rel_path}'
     rows.append([to_path, fname, fname])
-rows.append([f'kokoro/{version}/kokoro-v1_0.pth', 'kokoro-v1_0.pth', f'kokoro-v1_0.pth'])
+rows.append([f'kokoro/{version}/kokoro-v1_0.pth', 'kokoro-v1_0.pth', f'kokoro-v1_0.pth', ''])
 
+rows.append([f'kokoro/{version}/data/tts_wav.zip', 'data/tts_wav.zip', f'data/tts_wav.zip', 'unzip {} -d data/'])
 
-parent = 'data/tts读mp3文件'
-for fname in glob.glob(f'{parent}/**/*', recursive=True):
-    if os.path.isdir(fname):
-        continue
-    
-    rel_path = os.path.relpath(fname, ckpt)
-    to_path = f'kokoro/{version}/data/tts读mp3文件/{rel_path}'
-    rows.append([to_path, fname, fname])
 
 
 
 
 
 image_file = f'/mnt/data5/docker/kokoro_{version}.image'
-rows.append([f'kokoro/{version}/configs/images', image_file, f'configs/kokoro_{version}.image'])
+rows.append([f'kokoro/{version}/configs/images', image_file, f'configs/kokoro_{version}.image', 'docker load < {}'])
 
 for row in rows:
     writer.writerow([row[0], row[2]])
