@@ -206,7 +206,7 @@ def download_voice_files():
     
     return downloaded_voices
 
-def build_model(model_path: str, device: str) -> KPipeline:
+def build_model(model_path: str|None, device: str, lang_code = 'a') -> KPipeline:
     """Build and return the Kokoro pipeline with proper encoding configuration"""
     global _pipeline
     if _pipeline is None:
@@ -249,7 +249,7 @@ def build_model(model_path: str, device: str) -> KPipeline:
                 raise ValueError("No voice files available")
             
             # Initialize pipeline with American English by default
-            _pipeline = KPipeline(lang_code='a')
+            _pipeline = KPipeline(lang_code=lang_code)
             if _pipeline is None:
                 raise ValueError("Failed to initialize KPipeline - pipeline is None")
                 

@@ -5,6 +5,7 @@ import numpy as np
 import os
 import torch
 import logging
+import csv
 
 def setup_logging(level=logging.INFO):
     logging.getLogger().setLevel(level)
@@ -14,6 +15,10 @@ def setup_logging(level=logging.INFO):
         "%(asctime)s;%(process)d;%(levelname)s;%(message)s", "%Y-%m-%d %H:%M:%S")
     ch.setFormatter(formatter)
     logging.getLogger().handlers = [ch]
+
+with open('data/words.txt', 'r') as f:
+    ALL_WORDS = set(w.strip() for w in f.readlines())
+
 
 
 LHan = [[0x2E80, 0x2E99],    # Han # So  [26] CJK RADICAL REPEAT, CJK RADICAL RAP
@@ -150,10 +155,35 @@ def normalize_text_one(words:list[str], pattern:str, replacement:Callable[[re.Ma
             new_words += after.split(' ')
     return new_words, projections
 
+abbreviations = {}
+with open('data/所有要支持的缩写.csv', 'r', encoding='utf-8') as f:
+    reader = csv.reader(f)
+    for i, row in enumerate(reader):
+        if i == 0:
+            continue
+        def re_key(c, cased, last:bool):
+            if c.isalpha():
+                if cased == '0':
+                    return f'[{c.lower()}{c.upper()}]'
+                else:
+                    return f'[{c}]'
+            elif c == '.':
+                return f'[.]' if last else f'[.]\s*'
+            else:
+                return f'[{c}]'
+        short, long, cased, enable = row
+        if enable == '0':
+            continue
+        abbreviations[''.join(re_key(c, cased, i == len(short) - 1) for i, c in enumerate(short))] = long
+
+
+    
+
 def normalize_text(text:str) -> str:
     text = text.replace('[dot]', '.')
     projections = []
     words = text.split(' ')
+    #regex_url = r'(?:https?://)?(?:[-\w.]|(?:%[\da-fA-F]{2}))*'
     words, projections = normalize_text_one(words, r'([a-zA-Z0-9_.]+)\s*\@\s*([a-zA-Z0-9_.]+)', lambda x : f"{x.group(1).replace('.', ' dot ')} at {x.group(2).replace('.', ' dot ')}", projections)
     words, projections = normalize_text_one(words, r'1\s*\$', lambda x : r"one dollar", projections)
     words, projections = normalize_text_one(words, r'(\d+)\s*\$', lambda x : f"{num2words(int(x.group(1)))} dollars", projections)
@@ -163,15 +193,53 @@ def normalize_text(text:str) -> str:
     words, projections = normalize_text_one(words, r'(\d+)/(\d+)', lambda x : fraction_to_words(int(x.group(1)), int(x.group(2))), projections)
     words, projections = normalize_text_one(words, r'(\d+)\s*:\s*(\d+)', lambda x : f"{num2words(int(x.group(1)))} {num2words(int(x.group(2)))}", projections)
     words, projections = normalize_text_one(words, r'(\d+)(nd|th|st)', lambda x : f"{num2words(int(x.group(1)), to='ordinal')}", projections)
+    words, projections = normalize_text_one(words, r'\#\s*(\d+)', lambda x : f"number {num2words(int(x.group(1)))}", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)\%', lambda x : f"{num2words(float(x.group(1)))} percent", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)℃', lambda x : f"{num2words(float(x.group(1)))} degree Celsius", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)°C', lambda x : f"{num2words(float(x.group(1)))} degree Celsius", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)℉', lambda x : f"{num2words(float(x.group(1)))} degree Fahrenheit", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)°F', lambda x : f"{num2words(float(x.group(1)))} degree Fahrenheit", projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)°', lambda x : f"{num2words(float(x.group(1)))} degree", projections)
     words, projections = normalize_text_one(words, r'(\d+)s', lambda x : num2words(int(x.group(1)))+'s', projections)
+
+    
+    words, projections = normalize_text_one(words, r'<=', lambda x : 'less than or equal to', projections)
+    words, projections = normalize_text_one(words, r'>=', lambda x : 'greater than or equal to', projections)
+    words, projections = normalize_text_one(words, r'=', lambda x : 'equals', projections)
+    words, projections = normalize_text_one(words, r'<', lambda x : 'less than', projections)
+    words, projections = normalize_text_one(words, r'>', lambda x : 'greater than', projections)
+    
+    words, projections = normalize_text_one(words, r'\+', lambda x : 'plus', projections)
+    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)\s*\-\s*(\d+(\.\d+)?)', lambda x : f"{x.group(1)} minus {x.group(3)}", projections)
+    words, projections = normalize_text_one(words, r'×', lambda x : 'times', projections)
+    words, projections = normalize_text_one(words, r'÷', lambda x : 'divided by', projections)
+
+    words, projections = normalize_text_one(words, r'\d+\.\d+', lambda x : num2words(float(x.group(0))), projections)
     words, projections = normalize_text_one(words, r'\d+', lambda x : num2words(int(x.group(0))), projections)
+
+
     words, projections = normalize_text_one(words, r'([^0-9 ]*)(\d+)([^0-9 ]*)', lambda x : f"{x.group(1)} {num2words(int(x.group(2)))} {x.group(3)}", projections)
     
-    
+    for k, v in abbreviations.items():
+        words, projections = normalize_text_one(words, k, lambda x : v, projections)
     words, projections = normalize_text_one(words, r'([^ ]*)[^a-zA-Z\' "]+([^ ]*)', lambda x : re.sub(r'\s+', ' ', re.sub(r'[^a-zA-Z\' "]+', ' ', x.group(0))), projections)
     
     words, projections = normalize_text_one(words, r'[^a-zA-Z0-9 ,!.?\'; "]+', lambda x : '', projections)
-    return ' '.join(words), projections
+
+    
+    
+        
+
+    ret =  ' '.join(words)
+    def replace_cap_word(x:str):
+        if x.lower() in ALL_WORDS and x != 'A':
+            return x.lower()
+        return x
+    ret = re.sub(r'(\b)([A-Z_]+)(\b)', lambda x : x.group(1) + replace_cap_word(x.group(2)) + x.group(3), ret)
+
+    
+    
+    return ret, projections
 
 
 def reverse_normalized_text(words:list[dict], projections:list[tuple[list[str], int, list[str]]], create_new_words:Callable[[list[str], list[str]], list[str]]) -> str:
@@ -187,8 +255,59 @@ def get_audio_duration(audio:np.ndarray, sample_rate:int) -> float:
     return audio.shape[0] / sample_rate
 
 
+def split_sentences(text, predefined_words):
+    for text1 in _split_sentences_1(text):
+        texts = list(_split_sentences_2(text1))
+        prev = 0
+        for i in range(len(texts)):
+            if not texts[i].rstrip(',').lower() in predefined_words:
+                continue
+            else:
+                if prev < i:
+                    yield ''.join(texts[prev:i])
+                yield texts[i]
+                prev = i + 1
+        if prev < len(texts):
+            yield ''.join(texts[prev:])
+            
 
-def split_sentences(text, max_words=20):
+def _split_sentences_1(text):
+    text = re.sub(r'(\d)\.(\d)', r'\1[dot]\2', text)
+    replaces = []
+    def replace_abbreviations(k, before, after):
+        replaces.append(k)
+        return f'{before}_REPLACE_{len(replaces) - 1}_{after}'
+    for i, (k, v) in enumerate(abbreviations.items()):
+        text = re.sub(r'(\b|\s)' + k + r'(\b|\s)', lambda x : replace_abbreviations(x.group(0), x.group(1), x.group(2)), text)
+    matches = []
+    for m in re.finditer(r'([.!?;\n]+)', text):
+        matches.append((m.start(), m.end(), m.group()))
+    if not matches or matches[-1][1] != len(text):
+        matches.append((len(text), len(text), ''))
+    prev = 0
+    for start, end, delimiter in matches:
+        text1 = text[prev:end].strip()
+        prev = end
+        if text1:
+            text1 = text1.replace('[dot]', '.')
+            for i, k in enumerate(replaces):
+                text1 = text1.replace(f'_REPLACE_{i}_', k.replace(' ', ''))
+            yield text1
+       
+def _split_sentences_2(text):
+    matches = []
+    for m in re.finditer(r'([,]+)', text):
+        matches.append((m.start(), m.end(), m.group()))
+    if not matches or matches[-1][1] != len(text):
+        matches.append((len(text), len(text), ''))
+    prev = 0
+    for start, end, delimiter in matches:
+        text1 = text[prev:end].strip()
+        prev = end
+        if text1:
+            yield text1
+
+def split_sentences_old(text, max_words=20):
     text = text.strip()
     if len(text.split(' ')) <= max_words and text:
         yield text
@@ -235,17 +354,20 @@ def align_words_to_raw_input(input_text:str, words:list[dict], p = 0) -> list[di
     return words, p
 
 if __name__ == "__main__":
-
+    
     s = 'Please 你好 meet me at 7:30 PM at 42nd Street and 5th Avenue in 2024s during COVID-19. I will be wearing a red shirt worth 1$ and a blue shirt worth 2 $, my email address is shi.fan@gmail.com'
+    s = "It's 70°F outside."
+    s = "I can see a red bird. It's big. E.g. 100% of sb. sth."
     text = norm_text_for_split(s)
     print(text)
     text1s = []
-    for text in split_sentences(text):
+    for text in split_sentences(text, {}):
+        print('A0', text)
         text, projections = normalize_text(text)
-        print(text)
+        print('A1', text)
         text1 = reverse_normalized_text(text.split(' '), projections, lambda old_part, new_words : new_words)
         text1 = ' '.join(text1)
-        print(text1)
+        print('A2', text1)
         text1s.append(text1)
     text1s = ' '.join(text1s)
     print(text1s)

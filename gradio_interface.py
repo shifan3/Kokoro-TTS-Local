@@ -27,7 +27,7 @@ import time
 import tempfile
 import os
 import shutil
-from utils import norm_text_for_split, blend_voice
+from kokoro_utils import norm_text_for_split, blend_voice
 
 def generate_align_video(align_words:list[dict], uid):
     with open('manim_template.py', 'r', encoding='utf-8') as f:
@@ -78,7 +78,7 @@ def generate_audio(voice1, voice2, blend, reference_id, text, speed, sample_rate
 
 # Initialize model globally
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-model = KokoroTTS(device)
+model = KokoroTTS(device=device)
 
 def create_interface(server_name="0.0.0.0", server_port=7861):
     """Create and launch the Gradio interface."""

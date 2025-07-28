@@ -15,7 +15,7 @@ import json, uvicorn
 import soundfile as sf
 import tempfile
 from generate import KokoroTTS
-from utils import blend_voice, setup_logging
+from kokoro_utils import blend_voice, setup_logging, get_audio_duration
 
 
 app = FastAPI()
@@ -42,6 +42,12 @@ def decorate_word_timestamps(word_timestamps):
 def yield_sse_event(data):
     return "data: " +json.dumps(data) + "\n\n"
 
+
+@app.get("/ping")
+def ping():
+    return {"status": "success"}
+
+
 @app.get("/tts/blend")
 def blend(
     reference_id: str,
@@ -52,6 +58,9 @@ def blend(
 ):
     blend_voice(reference_id, voice1, voice2, blend)
     return {"status": "success"}
+
+
+
 @app.get("/tts/generate")
 def tts(
     text: str,
@@ -91,6 +100,7 @@ def tts(
 
             start_time = time.time()
             try:
+                prev_duration = 0
                 for audio, info in kokoro.generate_stream(voice=reference_id, 
                                                           text=text, 
                                                           speed=speed, 
@@ -106,10 +116,14 @@ def tts(
 
                     #word wise steaming
                     if word_timestamps:
+                        print(word_timestamps)
 
                         MAX_SEND_WORDS = 5
                         prev_sent = 0
                         word_timestamps = [word_timestamp for word_timestamp in word_timestamps if word_timestamp['index'] is not None]
+                        for word_timestamp in word_timestamps:
+                            word_timestamp['start'] += prev_duration
+                            word_timestamp['end'] += prev_duration
                         for i in range(0, len(word_timestamps), MAX_SEND_WORDS):
                             word_timestamps_part = word_timestamps[i:i+MAX_SEND_WORDS]
                             if not word_timestamps_part:
@@ -142,7 +156,7 @@ def tts(
                             'audio':base64.b64encode(audio.tobytes()).decode("utf-8"),
                             'word_timestamps' : None
                         })
-                
+                    prev_duration += get_audio_duration(audio, sample_rate)
             except Exception as e:
                 yield yield_sse_event({"action": 'error', 
                                                 'error': str(e)})
@@ -157,7 +171,7 @@ def setup_app(opts):
     setup_logging(logging.INFO)
     torch.multiprocessing.set_start_method('spawn')
     
-    kokoro = KokoroTTS('cuda')
+    kokoro = KokoroTTS(device='cuda')
     text = 'Please meet me at 7:30 PM at 42nd Street and 5th Avenue in 2024 COVID-19. I will be wearing a red shirt worth 1$ and a blue shirt worth 2 $.'
 
     for audio, info in kokoro.generate_stream("1", text, speed=0.6, trim_silence=True, align=True):
