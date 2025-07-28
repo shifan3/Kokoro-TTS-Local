@@ -40,5 +40,5 @@ logs/
 *.pid
 outputs
 data/tts读mp3文件
-pretrained_local
 docker/simfang.ttf
+pretrained_local

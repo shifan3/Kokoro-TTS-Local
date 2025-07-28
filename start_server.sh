@@ -1,5 +1,5 @@
 set -e
-NUM_WORKER=${NUM_WORKER:-1}
+NUM_WORKER=${NUM_WORKER:-4}
 PWD=$(pwd)
 docker kill kokoro-server || true
 docker rm kokoro-server || true
