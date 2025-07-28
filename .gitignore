@@ -40,3 +40,6 @@ logs/
 *.pid
 outputs
 pretrained_local
+data/tts_wav.zip
+data/tts读mp3文件
+*.ttf
