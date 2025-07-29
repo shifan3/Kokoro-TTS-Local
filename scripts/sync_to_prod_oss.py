@@ -38,10 +38,10 @@ for fname in glob.glob(f'{ckpt}/**/*', recursive=True):
     
     rel_path = os.path.relpath(fname, ckpt)
     to_path = f'kokoro/{version}/pretrained_local/{rel_path}'
-    rows.append([to_path, fname, fname])
+    rows.append([to_path, fname, fname, ''])
 rows.append([f'kokoro/{version}/kokoro-v1_0.pth', 'kokoro-v1_0.pth', f'kokoro-v1_0.pth', ''])
 
-rows.append([f'kokoro/{version}/data/tts_wav.zip', 'data/tts_wav.zip', f'data/tts_wav.zip', 'unzip {} -d data/'])
+rows.append([f'kokoro/{version}/data/tts_wav.zip', 'data/tts_wav.zip', f'data/tts_wav.zip', 'rm {}.tmp -rf && mv {} {}.tmp && unzip -o -q {}.tmp -d data/ && mv {}.tmp {}'])
 
 
 
@@ -49,16 +49,16 @@ rows.append([f'kokoro/{version}/data/tts_wav.zip', 'data/tts_wav.zip', f'data/tt
 
 
 image_file = f'/mnt/data5/docker/kokoro_{version}.image'
-rows.append([f'kokoro/{version}/configs/images', image_file, f'configs/kokoro_{version}.image', 'docker load < {}'])
+rows.append([f'kokoro/{version}/configs/images', image_file, f'configs/kokoro_{version}.image', ''])
 
 for row in rows:
-    writer.writerow([row[0], row[2]])
+    writer.writerow([row[0], row[2], row[3]])
 f_out.close()
 
 
 for row in rows:
-    assert len(row) == 3, row
-    to_path, fname, remote_path = row
+    assert len(row) == 4, row
+    to_path, fname, remote_path, cmd = row
     md5 = hashlib.md5()
     with open(fname, 'rb') as f:
         md5.update(f.read())

@@ -1,3 +1,12 @@
+kokoro/0.0.1/pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/vocab.json,pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/vocab.json,
+kokoro/0.0.1/pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/config.json,pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/config.json,
+kokoro/0.0.1/pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/tokenizer_config.json,pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/tokenizer_config.json,
+kokoro/0.0.1/pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/model.safetensors,pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/model.safetensors,
+kokoro/0.0.1/pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/special_tokens_map.json,pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/special_tokens_map.json,
+kokoro/0.0.1/kokoro-v1_0.pth,kokoro-v1_0.pth,
+kokoro/0.0.1/data/tts_wav.zip,data/tts_wav.zip,rm {}.tmp -rf && mv {} {}.tmp && unzip -o -q {}.tmp -d data/ && mv {}.tmp {}
+kokoro/0.0.1/configs/images,configs/kokoro_0.0.1.image,
+
 kokoro/0.0.2/pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/vocab.json,pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/vocab.json
 kokoro/0.0.2/pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/config.json,pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/config.json
 kokoro/0.0.2/pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/tokenizer_config.json,pretrained_local/MahmoudAshraf/mms-300m-1130-forced-aligner/tokenizer_config.json
