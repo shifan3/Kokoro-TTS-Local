@@ -37,3 +37,5 @@ if [ $SERVER_STARTED -eq $NUM_WORKER ]; then
     exit 0
 fi
 echo -e "${RED}server start failed${NOCOLOR}"
+
+exit 1
