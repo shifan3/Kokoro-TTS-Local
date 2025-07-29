@@ -22,9 +22,12 @@ for j in {1..2000}
 do
     sleep 0.1
     if grep "Application startup complete" engine.log ; then
-        echo -e "${GREEN}server started${NOCOLOR}"
+        
         SERVER_STARTED=`python -c "print($SERVER_STARTED + 1)"`
-        break
+        if [ $SERVER_STARTED -eq $NUM_WORKER ]; then
+            echo -e "${GREEN}server started${NOCOLOR}"
+            exit 0
+        fi
     else
         CURR_LINE=`cat engine.log | tail -n 1`
         if [ "$CURR_LINE" != "$PREV_LINE" ]; then
@@ -33,9 +36,7 @@ do
         fi
     fi
 done
-if [ $SERVER_STARTED -eq $NUM_WORKER ]; then
-    exit 0
-fi
+
 echo -e "${RED}server start failed${NOCOLOR}"
 
 exit 1
