@@ -17,21 +17,17 @@ def main():
     parser.add_option('-v', '--version', dest = 'version', type=str, default = None)
     parser.add_option('', '--oss-access-key', dest = 'oss_access_key', type=str, default = None)
     parser.add_option('', '--oss-access-secret', dest = 'oss_access_secret', type=str, default = None)
-    parser.add_option('', '--provider', dest = 'provider', type=str, default = None)
-    parser.add_option('', '--only-source', dest = 'only_source', action="store_true", default=False)
+    parser.add_option('', '--provider', dest = 'provider', type=str, default = 'tencent')
     opts, args = parser.parse_args()
     logging.basicConfig(level=logging.WARNING, stream=sys.stdout)
 
-    version = opts.version
-    if not version:
-        from version import VERSION
-        version = VERSION
+    version = opts.version or open('configs/version.txt', 'r').read().strip()
     if opts.provider == 'aliyun':
-        oss = AliyunOss(opts.oss_access_key, opts.oss_access_secret, bucket = 'danacommon', external = False)
+        oss = AliyunOss(opts.oss_access_key or os.environ['ALIYUN_OSS_ACCESS_KEY'], opts.oss_access_secret or os.environ['ALIYUN_OSS_ACCESS_SECRET'], bucket = 'danacommon', external = False)
     elif opts.provider == 'aliyun-external':
-        oss = AliyunOss(opts.oss_access_key, opts.oss_access_secret, bucket = 'danacommon', external = True)
+        oss = AliyunOss(opts.oss_access_key or os.environ['ALIYUN_OSS_ACCESS_KEY'], opts.oss_access_secret or os.environ['ALIYUN_OSS_ACCESS_SECRET'], bucket = 'danacommon', external = True)
     elif opts.provider == 'tencent':
-        oss = TencentOss(opts.oss_access_key, opts.oss_access_secret, bucket = 'engine-1328913057', region='ap-shanghai')
+        oss = TencentOss(opts.oss_access_key or os.environ['TENCENTCLOUD_SECRET_ID'], opts.oss_access_secret or os.environ['TENCENTCLOUD_SECRET_KEY'], bucket = 'engine-1328913057', region='ap-shanghai')
     else:
         raise ValueError(f'unknown provider: {opts.provider}')
     
@@ -63,7 +59,9 @@ def main():
             if not oss.download(oss_path, local_path, uploaded_md5):
                 raise Exception(f'failed to download {oss_path}')
             if cmd:
-                os.system(cmd.format(local_path))
+                cmd = cmd.replace('{}', local_path)
+                print(f'running {cmd}', flush=True)
+                os.system(cmd)
         
         print('all done', flush=True)
     except:
