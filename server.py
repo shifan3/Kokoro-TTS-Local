@@ -81,7 +81,7 @@ def tts(
     if not streaming:
         t1 = time.time()
         audio, info = kokoro.generate(reference_id, text, speed=speed, trim_silence=True, align=align)
-        logging.info("Time taken: ", time.time() - t1)
+        logging.info(f"Time taken: {time.time() - t1}")
         temp_file = tempfile.mktemp(suffix='.wav')
         try:    
             sf.write(temp_file, audio, sample_rate)

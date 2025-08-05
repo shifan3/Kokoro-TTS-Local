@@ -1,10 +1,15 @@
 ﻿缩写,发音,cased,enable
 sb.,somebody,1,
+sb,somebody,1,
 sth.,something,1,
+sth,something,1,
 e.g.,for example,0,
+e.g,for example,0,
 i.e.,that is,0,
 a.m.,AM,0,
+a.m,AM,0,
 p.m.,PM,0,
+p.m,PM,0,
 No.,number,1,0
 etc,et cetera,1,
 vs,versus,1,
@@ -41,10 +46,10 @@ min,minute,1,0
 sec,second,1,0
 ft,feet,0,0
 yd,yard,1,0
-kg,kilogram,1,0
-km,kilometer,1,0
-cm,centimeter,1,0
-mm,millimeter,1,0
+kg,kilogram,1,1
+km,kilometer,1,1
+cm,centimeter,1,1
+mm,millimeter,1,1
 g,gram,1,0
 mg,milligram,1,0
 L,liter,1,0

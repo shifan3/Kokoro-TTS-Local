@@ -23,7 +23,7 @@ do
     sleep 0.1
     if grep "Application startup complete" engine.log ; then
         
-        SERVER_STARTED=`python -c "print($SERVER_STARTED + 1)"`
+        SERVER_STARTED=`python3 -c "print($SERVER_STARTED + 1)"`
         if [ $SERVER_STARTED -eq $NUM_WORKER ]; then
             echo -e "${GREEN}server started${NOCOLOR}"
             exit 0

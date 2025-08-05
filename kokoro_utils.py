@@ -116,12 +116,15 @@ def norm_text_for_split(text:str) -> str:
 
         
         text = re.sub(r'([a-zA-Z0-9_.]+)\@([a-zA-Z0-9_.]+)', lambda x : f"{x.group(1).replace('.', '[dot]')}@{x.group(2).replace('.', '[dot]')}", text)
-
+        text = re.sub(r'(\d)\.(\d)', r'\1[dot]\2', text)
         text = re.sub(rf'\s*([{punkts}])', r'\1 ', text)
         text = re.sub(r'[-]', ' - ', text)
+
+        
         
         text = re.sub(r'\s+', ' ', text)
         text = text.replace('<br>', '\n')
+        #text = text.replace('[dot]', '.')
         lines.append(text.strip())
     return '\n'.join(lines).strip()
 
@@ -358,6 +361,8 @@ if __name__ == "__main__":
     s = 'Please 你好 meet me at 7:30 PM at 42nd Street and 5th Avenue in 2024s during COVID-19. I will be wearing a red shirt worth 1$ and a blue shirt worth 2 $, my email address is shi.fan@gmail.com'
     s = "It's 70°F outside."
     s = "I can see a red bird. It's big. E.g. 100% of sb. sth."
+    s = 'The package weighs 2.5 kg and measures 12" × 8" × 6". shifan3@gmail.com'
+    #s = 'shifan3@gmail.com'
     text = norm_text_for_split(s)
     print(text)
     text1s = []
