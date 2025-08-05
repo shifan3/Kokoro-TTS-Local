@@ -34,7 +34,6 @@ ENV/
 output*.wav
 *.pth
 *.onnx
-config.json
 *.log
 logs/
 *.pid
