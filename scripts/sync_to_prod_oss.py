@@ -40,7 +40,6 @@ for fname in glob.glob(f'{ckpt}/**/*', recursive=True):
     to_path = f'kokoro/{version}/pretrained_local/{rel_path}'
     rows.append([to_path, fname, fname, ''])
 rows.append([f'kokoro/{version}/kokoro-v1_0.pth', 'kokoro-v1_0.pth', f'kokoro-v1_0.pth', ''])
-
 rows.append([f'kokoro/{version}/data/tts_wav.zip', 'data/tts_wav.zip', f'data/tts_wav.zip', 'rm {}.tmp -rf && mv {} {}.tmp && unzip -o -q {}.tmp -d data/ && mv {}.tmp {}'])
 
 
