@@ -27,7 +27,7 @@ import time
 import tempfile
 import os
 import shutil
-from kokoro_utils import norm_text_for_split, blend_voice
+from kokoro_utils import norm_text_for_split, blend_voice, TESTCASES
 
 def generate_align_video(align_words:list[dict], uid):
     with open('manim_template.py', 'r', encoding='utf-8') as f:
@@ -43,9 +43,11 @@ def generate_align_video(align_words:list[dict], uid):
     return f'outputs/{uid}_audio.mp4'
     
 
-def generate_audio(voice1, voice2, blend, reference_id, text, speed, sample_rate, trim_silence, align, align_video):
+def generate_audio(voice1, voice2, blend, reference_id, text:str, predefined_text:str, speed, sample_rate, trim_silence, align, align_video):
     t1 = time.time()
     need_delete = False
+    if not text:
+        text = predefined_text
     if not reference_id:
         reference_id = str(uuid.uuid4())
         blend_voice(reference_id, voice1, voice2, blend)
@@ -124,6 +126,11 @@ def create_interface(server_name="0.0.0.0", server_port=7861):
                     label="Text",
                     value="Please meet me at 7:30 PM at 42nd Street and 5th Avenue in 2024 during COVID-19. I will be wearing a red shirt worth 1$ and a blue shirt worth 2 $. my email address is shi.fan@gmail.com"
                 )
+                predefined_text = gr.Dropdown(
+                    choices=[''] + list(map(lambda x: x[0], TESTCASES)),
+                    value='',
+                    label="Predefined Text"
+                )
                 speed = gr.Slider(
                     minimum=0.2,
                     maximum=5,
@@ -160,10 +167,10 @@ def create_interface(server_name="0.0.0.0", server_port=7861):
                 
         generate.click(
             fn=generate_audio,
-            inputs=[voice1, voice2, blend, reference_id, text, speed, sample_rate, trim_silence, align, align_video],
+            inputs=[voice1, voice2, blend, reference_id, text, predefined_text, speed, sample_rate, trim_silence, align, align_video],
             outputs=[output, align_output, align_video_output, logs]
         )
-    generate_audio(voices[0], voices[1], 1, '1', 'Please meet me at 7:30 PM at 42nd Street and 5th Avenue in 2024 during COVID-19. I will be wearing a red shirt worth 1$ and a blue shirt worth 2 $. my email address is shi.fan@gmail.com', 1, 24000, True, True, False)
+    generate_audio(voices[0], voices[1], 1, '1', 'Please meet me at 7:30 PM at 42nd Street and 5th Avenue in 2024 during COVID-19. I will be wearing a red shirt worth 1$ and a blue shirt worth 2 $. my email address is shi.fan@gmail.com', '', 1, 24000, True, True, False)
     # Launch interface
     interface.launch(
         server_name=server_name,

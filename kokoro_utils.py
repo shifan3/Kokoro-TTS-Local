@@ -1,5 +1,5 @@
 import re
-from num2words import num2words
+from num2words import num2words as _num2words
 from typing import Callable
 import numpy as np
 import os
@@ -86,15 +86,32 @@ def blend_voice(
     voice_blended = (voice2_model * blend) + (voice1_model * (1 - blend))
     torch.save(voice_blended, blend_path)
 
+
+def num2words(x:str|float|int, to:str='cardinal') -> str:
+    if isinstance(x, str):
+        x = x.replace(' ', '')
+        if '.' in x:
+            x = float(x)
+        else:
+            x = int(x)
+    return _num2words(x, to=to).replace(',', '')
+
 def fraction_to_words(numerator, denominator):
-    
-    denominator = num2words(denominator, to="ordinal")
-    if numerator > 1:
-        denominator += "s" 
+    if denominator == 2:
+        if numerator == 1:
+            denominator = 'half'
+        else:
+            denominator = 'halves'
+    else:
+        denominator = num2words(denominator, to="ordinal")
+        if numerator > 1:
+            denominator += "s" 
     numerator = num2words(numerator)
     return f"{numerator} {denominator}"
 
-punkts = '.,!?;:"/'
+
+
+punkts = '.,!?;:"'
 
 def norm_text_for_split(text:str) -> str:
     lines = []
@@ -114,6 +131,8 @@ def norm_text_for_split(text:str) -> str:
         for key, value in replacements.items():
             text = text.replace(key, value)
 
+        for c in '=+-*/×÷':
+            text = text.replace(c, f' {c} ')
         
         text = re.sub(r'([a-zA-Z0-9_.]+)\@([a-zA-Z0-9_.]+)', lambda x : f"{x.group(1).replace('.', '[dot]')}@{x.group(2).replace('.', '[dot]')}", text)
         text = re.sub(r'(\d)\.(\d)', r'\1[dot]\2', text)
@@ -128,11 +147,15 @@ def norm_text_for_split(text:str) -> str:
         lines.append(text.strip())
     return '\n'.join(lines).strip()
 
-def normalize_text_one(words:list[str], pattern:str, replacement:Callable[[re.Match[str]], str], projections:list[tuple[int, list[str], int, list[str]]]) -> str:
+def normalize_text_one(words:list[str], pattern:str|Callable[[str], list[re.Match[str]]], replacement:Callable[[re.Match[str]], str], projections:list[tuple[int, list[str], int, list[str]]]) -> str:
     new_words = []
     matches:list[re.Match[str]] = []
     text = ' '.join(words)
-    for match in re.finditer(pattern, text):
+    if isinstance(pattern, str):
+        find_func = lambda text: list(re.finditer(pattern, text))
+    else:
+        find_func = pattern
+    for match in find_func(text):
         if match.start() > 0 and text[match.start()-1] != ' ':
             continue
         if match.end() < len(text) and text[match.end()] not in punkts + ' ':
@@ -164,10 +187,12 @@ with open('data/所有要支持的缩写.csv', 'r', encoding='utf-8') as f:
     for i, row in enumerate(reader):
         if i == 0:
             continue
-        def re_key(c, cased, last:bool):
+        def re_key(c, cased, last:bool, first:bool):
             if c.isalpha():
                 if cased == '0':
                     return f'[{c.lower()}{c.upper()}]'
+                elif first and c.islower():
+                    return f'[{c}{c.upper()}]'
                 else:
                     return f'[{c}]'
             elif c == '.':
@@ -177,10 +202,48 @@ with open('data/所有要支持的缩写.csv', 'r', encoding='utf-8') as f:
         short, long, cased, enable = row
         if enable == '0':
             continue
-        abbreviations[''.join(re_key(c, cased, i == len(short) - 1) for i, c in enumerate(short))] = long
+        abbreviations[''.join(re_key(c, cased, i == len(short) - 1, i == 0) for i, c in enumerate(short))] = long
 
 
-    
+def convert_date(year:int, month:int, day:int) -> str:
+    if month > 12 and day <= 12:
+        month, day = day, month
+    year_s = num2words(year, to='year')
+    if month <= 12 and month > 0:
+        month_s = [
+            'January',
+            'February',
+            'March',
+            'April',
+            'May',
+            'June',
+            'July',
+            'August',
+            'September',
+            'October',
+            'November',
+            'December',
+        ][month - 1]
+    else:
+        month_s = num2words(month, to='ordinal')
+    day_s = num2words(day, to='ordinal')
+    return f"{year_s} {month_s} the {day_s}"
+
+def convert_power(base:float, power:float) -> str:
+    base_s = num2words(base)
+    if power == 2:
+        return f"{base_s} squared"
+    elif power == 3:
+        return f"{base_s} cubed"
+    else:
+        return f"{base_s} to the power of {num2words(power)}"
+
+
+def convert_time(hour:int, minute:int) -> str:
+    if minute == 0:
+        return f"{num2words(hour)} o clock"
+    else:
+        return f"{num2words(hour)} {num2words(minute)}"
 
 def normalize_text(text:str) -> str:
     text = text.replace('[dot]', '.')
@@ -189,22 +252,26 @@ def normalize_text(text:str) -> str:
     #regex_url = r'(?:https?://)?(?:[-\w.]|(?:%[\da-fA-F]{2}))*'
     words, projections = normalize_text_one(words, r'([a-zA-Z0-9_.]+)\s*\@\s*([a-zA-Z0-9_.]+)', lambda x : f"{x.group(1).replace('.', ' dot ')} at {x.group(2).replace('.', ' dot ')}", projections)
     words, projections = normalize_text_one(words, r'1\s*\$', lambda x : r"one dollar", projections)
-    words, projections = normalize_text_one(words, r'(\d+)\s*\$', lambda x : f"{num2words(int(x.group(1)))} dollars", projections)
+    words, projections = normalize_text_one(words, r'(\d+\.?\d*)\s*\$', lambda x : f"{num2words(x.group(1))} dollars", projections)
+    words, projections = normalize_text_one(words, r'\$\s*(\d+\.?\d*)', lambda x : f"{num2words(x.group(1))} dollars", projections)
+    words, projections = normalize_text_one(words, r'(\d\d\d\d)\s*[\\/]\s*(\d\d?)\s*[\\/]\s*(\d\d?)', lambda x : convert_date(int(x.group(1)), int(x.group(2)), int(x.group(3))), projections)
+    words, projections = normalize_text_one(words, r'(\d\d?)\s*[\\/]\s*(\d\d?)\s*[\\/]\s*(\d\d\d\d)', lambda x : convert_date(int(x.group(3)), int(x.group(1)), int(x.group(2))), projections)
     words, projections = normalize_text_one(words, r'\d\d\d\d', lambda x : f"{num2words(int(x.group(0)), to='year')}", projections)
     words, projections = normalize_text_one(words, r'\\frac{(\d+)}{(\d+)}', lambda x : fraction_to_words(int(x.group(1)), int(x.group(2))), projections)
-    words, projections = normalize_text_one(words, r'`(\d+)s*/s*(\d+)`', lambda x : fraction_to_words(int(x.group(1)), int(x.group(2))), projections)
-    words, projections = normalize_text_one(words, r'(\d+)/(\d+)', lambda x : fraction_to_words(int(x.group(1)), int(x.group(2))), projections)
-    words, projections = normalize_text_one(words, r'(\d+)\s*:\s*(\d+)', lambda x : f"{num2words(int(x.group(1)))} {num2words(int(x.group(2)))}", projections)
-    words, projections = normalize_text_one(words, r'(\d+)(nd|th|st)', lambda x : f"{num2words(int(x.group(1)), to='ordinal')}", projections)
+    words, projections = normalize_text_one(words, r'`(\d+)\s*/\s*(\d+)`', lambda x : fraction_to_words(int(x.group(1)), int(x.group(2))), projections)
+    words, projections = normalize_text_one(words, r'(\d+)\s*/\s*(\d+)', lambda x : fraction_to_words(int(x.group(1)), int(x.group(2))), projections)
+    words, projections = normalize_text_one(words, r'(\d+)\s*:\s*(\d+)', lambda x : convert_time(int(x.group(1)), int(x.group(2))), projections)
+    words, projections = normalize_text_one(words, r'(\d+)(nd|th|st|rd)', lambda x : f"{num2words(int(x.group(1)), to='ordinal')}", projections)
     words, projections = normalize_text_one(words, r'\#\s*(\d+)', lambda x : f"number {num2words(int(x.group(1)))}", projections)
     words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)\%', lambda x : f"{num2words(float(x.group(1)))} percent", projections)
-    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)℃', lambda x : f"{num2words(float(x.group(1)))} degree Celsius", projections)
-    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)°C', lambda x : f"{num2words(float(x.group(1)))} degree Celsius", projections)
-    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)℉', lambda x : f"{num2words(float(x.group(1)))} degree Fahrenheit", projections)
-    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)°F', lambda x : f"{num2words(float(x.group(1)))} degree Fahrenheit", projections)
-    words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)°', lambda x : f"{num2words(float(x.group(1)))} degree", projections)
+    words, projections = normalize_text_one(words, r'(([+-]\s*)?\d+(\.\d+)?)\s*℃', lambda x : f"{num2words(x.group(1))} degree Celsius", projections)
+    words, projections = normalize_text_one(words, r'(([+-]\s*)?\d+(\.\d+)?)\s*°C', lambda x : f"{num2words(x.group(1))} degree Celsius", projections)
+    words, projections = normalize_text_one(words, r'(([+-]\s*)?\d+(\.\d+)?)\s*℉', lambda x : f"{num2words(x.group(1))} degree Fahrenheit", projections)
+    words, projections = normalize_text_one(words, r'(([+-]\s*)?\d+(\.\d+)?)\s*°F', lambda x : f"{num2words(x.group(1))} degree Fahrenheit", projections)
+    words, projections = normalize_text_one(words, r'(([+-]\s*)?\d+(\.\d+)?)°', lambda x : f"{num2words(float(x.group(1)))} degree", projections)
     words, projections = normalize_text_one(words, r'(\d+)s', lambda x : num2words(int(x.group(1)))+'s', projections)
-
+    words, projections = normalize_text_one(words, r'\\sqrt\{([^}]*)\}', lambda x : f'the square root of {x.group(1)}', projections)
+    words, projections = normalize_text_one(words, r'(\d+\.?\d*)\^(\d+\.?\d*)', lambda x : convert_power(float(x.group(1)), float(x.group(2))), projections)
     
     words, projections = normalize_text_one(words, r'<=', lambda x : 'less than or equal to', projections)
     words, projections = normalize_text_one(words, r'>=', lambda x : 'greater than or equal to', projections)
@@ -215,9 +282,12 @@ def normalize_text(text:str) -> str:
     words, projections = normalize_text_one(words, r'\+', lambda x : 'plus', projections)
     words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)\s*\-\s*(\d+(\.\d+)?)', lambda x : f"{x.group(1)} minus {x.group(3)}", projections)
     words, projections = normalize_text_one(words, r'×', lambda x : 'times', projections)
+    words, projections = normalize_text_one(words, r'\\times', lambda x : 'times', projections)
     words, projections = normalize_text_one(words, r'÷', lambda x : 'divided by', projections)
+    words, projections = normalize_text_one(words, r'\\div', lambda x : 'divided by', projections)
 
-    words, projections = normalize_text_one(words, r'\d+\.\d+', lambda x : num2words(float(x.group(0))), projections)
+    words, projections = normalize_text_one(words, r'([-]\s*)?\d+\.\d+', lambda x : num2words(x.group(0)), projections)
+    words, projections = normalize_text_one(words, r'\-\s*(\d+)', lambda x : f'minus {num2words(int(x.group(1)))}', projections)
     words, projections = normalize_text_one(words, r'\d+', lambda x : num2words(int(x.group(0))), projections)
 
 
@@ -225,7 +295,7 @@ def normalize_text(text:str) -> str:
     
     for k, v in abbreviations.items():
         words, projections = normalize_text_one(words, k, lambda x : v, projections)
-    words, projections = normalize_text_one(words, r'([^ ]*)[^a-zA-Z\' "]+([^ ]*)', lambda x : re.sub(r'\s+', ' ', re.sub(r'[^a-zA-Z\' "]+', ' ', x.group(0))), projections)
+    words, projections = normalize_text_one(words, r'([^ ]*)[^a-zA-Z\' "]+([^ ]*)', lambda x : re.sub(r'\s+', ' ', re.sub(r'[^a-zA-Z\',.!?:; "]+', ' ', x.group(0))), projections)
     
     words, projections = normalize_text_one(words, r'[^a-zA-Z0-9 ,!.?\'; "]+', lambda x : '', projections)
 
@@ -271,7 +341,7 @@ def split_sentences(text, predefined_words):
                 yield texts[i]
                 prev = i + 1
         if prev < len(texts):
-            yield ''.join(texts[prev:])
+            yield ' '.join(texts[prev:])
             
 
 def _split_sentences_1(text):
@@ -356,25 +426,69 @@ def align_words_to_raw_input(input_text:str, words:list[dict], p = 0) -> list[di
         p = p1 + len(word['text'])
     return words, p
 
-if __name__ == "__main__":
+TESTCASES:list[tuple[str, list[str]]] = [
     
-    s = 'Please 你好 meet me at 7:30 PM at 42nd Street and 5th Avenue in 2024s during COVID-19. I will be wearing a red shirt worth 1$ and a blue shirt worth 2 $, my email address is shi.fan@gmail.com'
-    s = "It's 70°F outside."
-    s = "I can see a red bird. It's big. E.g. 100% of sb. sth."
-    s = 'The package weighs 2.5 kg and measures 12" × 8" × 6". shifan3@gmail.com'
-    #s = 'shifan3@gmail.com'
-    text = norm_text_for_split(s)
-    print(text)
-    text1s = []
-    for text in split_sentences(text, {}):
-        print('A0', text)
-        text, projections = normalize_text(text)
-        print('A1', text)
-        text1 = reverse_normalized_text(text.split(' '), projections, lambda old_part, new_words : new_words)
-        text1 = ' '.join(text1)
-        print('A2', text1)
-        text1s.append(text1)
-    text1s = ' '.join(text1s)
-    print(text1s)
-    print(s)
-    assert text1s.replace(' ', '') == s.replace(' ', '')
+    ('Sth. is wrong', ['Something is wrong']),
+    ('Can you give me sth.?', ['Can you give me something ?']),
+    ('I need sth. to write with', ['I need something to write with']),
+    ('Sb gave me sth, I really need it', ['Somebody gave me something, I really need it']),
+    ('Sb. left their phone at home', ['Somebody left their phone at home']),
+    ('Can sb. help me? I need help', ['Can somebody help me?', 'I need help']),
+    ('Please tell sb to call me back', ['Please tell somebody to call me back']),
+    ('The water freezes at 0°C', ['The water freezes at zero degree Celsius']),
+    ('The temperature is -20.5°C', ['The temperature is minus twenty point five degree Celsius']),
+    ('The discount is 20% off', ['The discount is twenty percent off']),
+    ('The battery is at 80.5%', ['The battery is at eighty point five percent']),
+    ('He is #1 tennis player in the world', ['He is number one tennis player in the world']),
+    ('Please go to room #345', ['Please go to room number three hundred and forty five']),
+    ('The meeting starts at 10:00 AM', ['The meeting starts at ten o clock am']),
+    ('I wake up at 7:45 in the morning', ['I wake up at seven forty five in the morning']),
+    ('She lives on the 1st floor', ['She lives on the first floor']),
+    ('He lives on the 2nd floor', ['He lives on the second floor']),
+    ('he finish 5th in the race', ['he finish fifth in the race']),
+    ('this is my 3rd visit to London', ['this is my third visit to London']),
+    ('3^4=81', ['three to the power of four equals eighty one']),
+    ('2^2 is same as 2 times 2', ['two squared is same as two times two']),
+    ('2^2=4', ['two squared equals four']),
+    ('2.5^2=6.25', ['two point five squared equals six point two five']),
+    ('6.25^0.5=2.5', ['six point two five to the power of zero point five equals two point five']),
+    ('\\sqrt{6.25}=2.5', ['the square root of six point two five equals two point five']),
+    ('Add `1/2` teaspoons of salt', ['Add one half teaspoons of salt']),
+    ('the jar is `3/4` full', ['the jar is three fourths full']),
+    ('She ate 3/4 of the pizza', ['She ate three fourths of the pizza']),
+    ('the recipe calls for 1/3 cup of sugar', ['the recipe calls for one third cup of sugar']),
+    ('1/2 of the cake is gone', ['One half of the cake is gone']),
+    ('I have \\frac{1}{2} of the cake', ['I have one half of the cake']),
+    ('\\frac{4}{3} \\times 3 = 4', ['four thirds times three equals four']),
+    ('\\frac{4}{3}×3=4', ['four thirds times three equals four']),
+    ('He was born in 1990', ['He was born in nineteen ninety']),
+    ('He was born in 1990/03/04', ['He was born in nineteen ninety March the fourth']),
+    ('He was born in 1990\\11\\24', ['He was born in nineteen ninety November the twenty fourth']),
+    ('She earned $1600 last month', ['She earned one thousand six hundred dollars last month']),
+    ('The price is 20$', ['The price is twenty dollars']),
+    ('The price is $20.5', ['The price is twenty point five dollars']),
+    ('please send an email to support@company.com', ['please send an email to support at company dot com']),
+    ('you can reach me at john.doe@gmail.com', ['you can reach me at john dot doe at gmail dot com']),
+    ('Contact us at info@website.org for more information', ['Contact us at info at website dot org for more information']),
+    
+]
+
+def test_testcases():
+    for s, expected in TESTCASES:
+        text = norm_text_for_split(s)
+        normalized_texts = []
+        expected = list(map(lambda x: x.lower(), expected))
+        text1s = []
+        for text in split_sentences(text, {}):
+            text, projections = normalize_text(text)
+            normalized_texts.append(text.lower())
+            text1 = reverse_normalized_text(text.split(' '), projections, lambda old_part, new_words : new_words)
+            text1 = ' '.join(text1)
+            text1s.append(text1)
+        text1s = ' '.join(text1s)
+        assert normalized_texts == expected, f'{normalized_texts} != {expected}'
+        assert text1s.replace(' ', '').lower() == s.replace(' ', '').lower(), f'{text1s} != {s}'
+
+
+if __name__ == "__main__":
+    test_testcases()
