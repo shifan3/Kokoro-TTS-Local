@@ -27,7 +27,7 @@ import time
 import tempfile
 import os
 import shutil
-from kokoro_utils import norm_text_for_split, blend_voice, TESTCASES
+from kokoro_utils import norm_text_for_split, blend_voice, NORMALIZE_TESTCASES
 
 def generate_align_video(align_words:list[dict], uid):
     with open('manim_template.py', 'r', encoding='utf-8') as f:
@@ -127,9 +127,15 @@ def create_interface(server_name="0.0.0.0", server_port=7861):
                     value="Please meet me at 7:30 PM at 42nd Street and 5th Avenue in 2024 during COVID-19. I will be wearing a red shirt worth 1$ and a blue shirt worth 2 $. my email address is shi.fan@gmail.com"
                 )
                 predefined_text = gr.Dropdown(
-                    choices=[''] + list(map(lambda x: x[0], TESTCASES)),
+                    choices=[''] + list(map(lambda x: x[0], NORMALIZE_TESTCASES)),
                     value='',
-                    label="Predefined Text"
+                    label="Predefined Text",
+                    interactive=True
+                )
+                predefined_text.change(
+                    fn=lambda selected_text: selected_text if selected_text else text.value,
+                    inputs=predefined_text,
+                    outputs=text
                 )
                 speed = gr.Slider(
                     minimum=0.2,

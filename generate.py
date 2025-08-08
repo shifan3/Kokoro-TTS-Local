@@ -109,7 +109,7 @@ class KokoroTTS:
         align_p = 0
         temp_dir = tempfile.mkdtemp()
         try:
-            
+            projections = []
             speed1 = speed if speed >= 1 else 1
             speed2 = speed / speed1
             if duration is not None:

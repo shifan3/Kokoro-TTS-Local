@@ -44,14 +44,14 @@ Sun,Sunday,1,0
 hr,hour,1,0
 min,minute,1,0
 sec,second,1,0
-ft,feet,0,0
-yd,yard,1,0
+ft,feet,0,1
+yd,yard,1,1
 kg,kilogram,1,1
 km,kilometer,1,1
 cm,centimeter,1,1
 mm,millimeter,1,1
 g,gram,1,0
-mg,milligram,1,0
+mg,milligram,1,1
 L,liter,1,0
 mL,milliliter,1,0
 St,street,1,

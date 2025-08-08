@@ -113,22 +113,28 @@ def fraction_to_words(numerator, denominator):
 
 punkts = '.,!?;:"'
 
+norm_text_for_split_replacements = {
+    '。': '.',
+    '，': ',',
+    '！': '!',
+    '？': '?',
+    '；': ';',
+    '：': ':',
+    '“': '"',
+    '”': '"',
+    '‘': "'",
+    '’': "'",
+}
+
+norm_text_for_split_replacements_rev = {v: k for k, v in norm_text_for_split_replacements.items()}
+
+
+#注意，改了这个函数，要同步修改align_words_to_raw_input
 def norm_text_for_split(text:str) -> str:
     lines = []
     for text in text.split('\n'):
-        replacements = {
-            '。': '.',
-            '，': ',',
-            '！': '!',
-            '？': '?',
-            '；': ';',
-            '：': ':',
-            '“': '"',
-            '”': '"',
-            '‘': "'",
-            '’': "'",
-        }
-        for key, value in replacements.items():
+
+        for key, value in norm_text_for_split_replacements.items():
             text = text.replace(key, value)
 
         for c in '=+-*/×÷':
@@ -278,10 +284,15 @@ def normalize_text(text:str) -> str:
     words, projections = normalize_text_one(words, r'=', lambda x : 'equals', projections)
     words, projections = normalize_text_one(words, r'<', lambda x : 'less than', projections)
     words, projections = normalize_text_one(words, r'>', lambda x : 'greater than', projections)
+
+    #words, projections = normalize_text_one(words, r'&', lambda x : 'and', projections)
+
+    words, projections = normalize_text_one(words, r'([^ ]*)&([^ ]*)', lambda x : f'{x.group(1)} and {x.group(2)}', projections)
     
     words, projections = normalize_text_one(words, r'\+', lambda x : 'plus', projections)
     words, projections = normalize_text_one(words, r'(\d+(\.\d+)?)\s*\-\s*(\d+(\.\d+)?)', lambda x : f"{x.group(1)} minus {x.group(3)}", projections)
     words, projections = normalize_text_one(words, r'×', lambda x : 'times', projections)
+    
     words, projections = normalize_text_one(words, r'\\times', lambda x : 'times', projections)
     words, projections = normalize_text_one(words, r'÷', lambda x : 'divided by', projections)
     words, projections = normalize_text_one(words, r'\\div', lambda x : 'divided by', projections)
@@ -414,21 +425,40 @@ def split_sentences_old(text, max_words=20):
 
 def align_words_to_raw_input(input_text:str, words:list[dict], p = 0) -> list[dict]:
     input_text = input_text.strip().lower()
-    for word in words:
+    for i_w, word in enumerate(words):
         w = re.sub(r'[^a-zA-Z0-9]+$', '', word['text']).lower()
         w = re.sub(r'^[^a-zA-Z0-9]+', '', word['text']).lower()
+        w = w.replace(' ', '')
+        
+
+        pattern = ''
+        for i in range(len(w)):
+            c = w[i]
+            if c in norm_text_for_split_replacements.keys():
+                c1 = norm_text_for_split_replacements[c]
+                c = f'[{c}{c1}]'
+            elif c in norm_text_for_split_replacements_rev.keys():
+                c1 = norm_text_for_split_replacements_rev[c]
+                c = f'[{c}{c1}]'
+            else:
+                c = re.escape(c)
+            pattern += c + r'\s*'
         #print('FIND', w, input_text[p:])
-        p1 = input_text.find(w, p)
-        if p1 == -1:
-            word['index'] = None
+        p1 = re.search(pattern, input_text[p:])
+        if p1 is None:
+            word['index'] = 0 if i_w == 0 else words[i_w - 1]['index'] + len(words[i_w - 1]['text']) + 1
         else:
-            word['index'] = p1
-        p = p1 + len(word['text'])
+            word['index'] = p + p1.start()
+            p = p + p1.end()
     return words, p
 
-TESTCASES:list[tuple[str, list[str]]] = [
+NORMALIZE_TESTCASES:list[tuple[str, list[str]]] = [
     
     ('Sth. is wrong', ['Something is wrong']),
+    ('R&D', ['R and D']),
+    ('R& D', ['R and D']),
+    ('R & D', ['R and D']),
+    ('R &D', ['R and D']),
     ('Can you give me sth.?', ['Can you give me something ?']),
     ('I need sth. to write with', ['I need something to write with']),
     ('Sb gave me sth, I really need it', ['Somebody gave me something, I really need it']),
@@ -473,8 +503,8 @@ TESTCASES:list[tuple[str, list[str]]] = [
     
 ]
 
-def test_testcases():
-    for s, expected in TESTCASES:
+def test_normalize_testcases():
+    for s, expected in NORMALIZE_TESTCASES:
         text = norm_text_for_split(s)
         normalized_texts = []
         expected = list(map(lambda x: x.lower(), expected))
@@ -490,5 +520,19 @@ def test_testcases():
         assert text1s.replace(' ', '').lower() == s.replace(' ', '').lower(), f'{text1s} != {s}'
 
 
+ALIGN_TESTCASES:list[tuple[str, list[str]]] = [
+    ("a@b.c", [{"text": "a@b.c", "index": 0}], [{'text': 'a@b.c', 'index': 0}]),
+    ("align \"", [{"text": "align\"", "index": 0}], [{'text': 'align\"', 'index': 0}]),
+    ("align？", [{"text": "align?", "index": 0}], [{'text': 'align?', 'index': 0}]),
+]
+
+def test_align_testcases():
+    for s, words, expected in ALIGN_TESTCASES:
+        aligned, _ = align_words_to_raw_input(s, words)
+        assert aligned == expected, f'{aligned} != {expected}'
+
+
 if __name__ == "__main__":
-    test_testcases()
+    test_align_testcases()
+    test_normalize_testcases()
+    
